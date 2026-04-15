@@ -18,6 +18,8 @@ import sys
 import logging
 from typing import Optional
 
+import serial.serialutil
+
 from .serial_port import SerialPort, list_ports
 from .protocol import PokewalkerProtocol
 from .commands import PokewalkerCommands
@@ -42,23 +44,49 @@ def connect(port: str, timeout: float = 5.0) -> Optional[tuple]:
     Returns:
         Tuple of (SerialPort, PokewalkerProtocol, PokewalkerCommands) or None
     """
-    serial = SerialPort(port)
-    serial.open()
+    serial_port = SerialPort(port)
     
-    protocol = PokewalkerProtocol(serial)
+    try:
+        serial_port.open()
+    except serial.serialutil.SerialException as e:
+        if "No such file or directory" in str(e) or "FileNotFoundError" in str(e):
+            print(f"ERROR: Serial port '{port}' not found.")
+            print()
+            print("Available ports:")
+            ports = list_ports()
+            if ports:
+                for p in ports:
+                    print(f"  - {p}")
+            else:
+                print("  (no serial ports detected)")
+            print()
+            print("Make sure your USB-IrDA dongle is connected.")
+            print("Use 'pokewalker ports' to list available ports.")
+        elif "Permission denied" in str(e):
+            print(f"ERROR: Permission denied for '{port}'.")
+            print()
+            print("Try one of the following:")
+            print(f"  - Run with sudo: sudo pokewalker -p {port} <command>")
+            print(f"  - Add yourself to the dialout group: sudo usermod -a -G dialout $USER")
+            print("    (then log out and back in)")
+        else:
+            print(f"ERROR: Could not open serial port '{port}': {e}")
+        return None
+    
+    protocol = PokewalkerProtocol(serial_port)
     
     print(f"Waiting for Pokewalker on {port}...")
     print("Press the center button on your Pokewalker to enter communication mode.")
     
     if not protocol.connect(timeout=timeout):
         print("Failed to connect. Make sure your Pokewalker is in communication mode.")
-        serial.close()
+        serial_port.close()
         return None
     
     print("Connected!")
     
     commands = PokewalkerCommands(protocol)
-    return serial, protocol, commands
+    return serial_port, protocol, commands
 
 
 def cmd_info(args) -> int:
