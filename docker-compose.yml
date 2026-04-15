@@ -1,0 +1,31 @@
+services:
+  pokewalker:
+    build: .
+    # Pass through USB IR dongle - adjust device path as needed
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    # For development: mount source code
+    # volumes:
+    #   - ./pokewalker_client:/app/pokewalker_client:ro
+    #   - ./tests:/app/tests:ro
+
+  # Development container with shell access
+  dev:
+    build: .
+    entrypoint: /bin/bash
+    stdin_open: true
+    tty: true
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    volumes:
+      - ./pokewalker_client:/app/pokewalker_client
+      - ./tests:/app/tests
+
+  # Run tests
+  test:
+    build: .
+    entrypoint: pytest
+    command: ["-v"]
+    volumes:
+      - ./pokewalker_client:/app/pokewalker_client:ro
+      - ./tests:/app/tests:ro
